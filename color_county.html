@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width = device-width, initial-scale = 1.0">
+	<script src="./libs/d3.js"></script>
+	<script src="https://d3js.org/topojson.v1.min.js"></script>
+	<title>Massachusetts Counties</title>
+	<style>
+		body {
+			text-align: center;
+			margin: auto;
+			font-family: sans-serif;
+		}
+
+		#tooltip {
+			position: absolute;
+			opacity: 0;
+			top: 0;
+			left: 0;
+			width: auto;
+			padding: 10px;
+			background: white;
+			font-family: sans-serif;
+			font-size: medium;
+			border-radius: 2px;
+			line-height: 1;
+		}
+
+		path {
+			stroke-width: 0.5px;
+			stroke: black;
+		}
+
+		path:hover {
+			opacity: 0.6;
+			stroke: black;
+			stroke-width: 4px;
+		}
+
+		svg {
+			margin: auto;
+			width: 80%;
+			padding: 10px;
+			text-align: center;
+
+		}
+	</style>
+</head>
+
+<body>
+	<div id="tooltip"></div>
+	<h1>
+		Massachusetts Counties
+	</h1>
+	<h3>
+		David English
+	</h3>
+
+	<script>
+		// dimension of the page
+		const page_dims = {
+			width: window.innerWidth,
+			height: window.innerHeight
+		};
+		const margin = page_dims.width * 0.2
+		// a topojson file containing population of each town in different years
+		const MA_counties = "./data/towns.topojson"
+		const county_map = "./data/county_map.csv"
+		Promise.all([
+			d3.json(MA_counties),
+			d3.csv(county_map)
+		]).then(data => {
+			const topo_data = data[0];
+			const name_data = data[1];
+			const geojson = topojson.feature(topo_data, topo_data.objects.ma);
+
+			/*-------------------------------------------------------*/
+			/*----------------geoPath generator----------------------*/
+			/*-------------------------------------------------------*/
+			const geoPath_generator = d3.geoPath()
+				.projection(d3.geoMercator()
+					.fitSize([page_dims.width - margin, page_dims.height - margin], geojson))
+
+			/*-------------------------------------------------------*/
+			/*----------------------Color Scaling--------------------*/
+			/*-------------------------------------------------------*/
+			var colorInterpolator = d3.interpolateRgbBasis(["blue", "steelblue", "green", "purple", "red"])
+			//if data is scaled using a log scale
+			let logScale = d3.scaleLog()
+				.domain(d3.extent(geojson.features, (d) => {
+					return d['properties']['FIPS_STCO']
+				}))
+			//if data is scaled using a linear scale
+			let linearScale = d3.scaleLinear()
+				.domain(d3.extent(geojson.features, (d) => {
+					return d['properties']['FIPS_STCO']
+				}))
+
+			/*-------------------------------------------------------*/
+			/*---------------------- Tooltip ------------------------*/
+			/*-------------------------------------------------------*/
+			const tooltip = d3.select("#tooltip");
+			// Append a SVG element to body, then append a path for the boundaries
+			let svg = d3.select("body").append("svg")
+				.attr("width", "100vw")
+				.attr("height", "100vh");
+			//add path for the boundaries
+			svg.selectAll("path")
+				.data(geojson.features)
+				.enter()
+				.append("path")
+				.attr("d", d => geoPath_generator(d))
+				//.attr("fill", d => colorInterpolator(logScale(d['properties']['FIPS_STCO'])))
+				.attr("fill", d => colorInterpolator(linearScale(d['properties']['FIPS_STCO'])))
+				.on("mouseenter", (m, d) => {
+					tooltip.transition()
+						.duration(200)
+						.style("opacity", 0.9)
+
+					d3.selectAll("path")
+						.filter(function (p, q) { return p["properties"]["FIPS_STCO"] === d["properties"]["FIPS_STCO"] })
+						.style("opacity", ".5")
+				})
+				.on("mousemove", (m, d) => {
+					tooltip.style("opacity", 0.9)
+				})
+				.on("mouseout", (m, d) => {
+					tooltip.transition()
+						.duration(200)
+						.style("opacity", 0)
+					d3.selectAll("path")
+						.filter(function (p, q) { return p["properties"]["FIPS_STCO"] === d["properties"]["FIPS_STCO"] })
+						.style("opacity", "1")
+				})
+		})
+
+	</script>
+</body>
+
+</html>
